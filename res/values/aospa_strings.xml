@@ -7,6 +7,7 @@
 
     <!-- Hardware info -->
     <string name="platform_revision">Platform</string>
+    <string name="soc_model">SoC Model</string>
 
     <!-- Label for device's hardware ram size [CHAR LIMIT=40] -->
     <string name="total_ram">Total available RAM</string>
