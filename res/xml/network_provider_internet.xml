@@ -54,6 +54,18 @@
         settings:useAdminDisabledSummary="true"
         settings:searchable="@bool/config_show_sim_info"/>
 
+    <Preference
+        android:key="preferred_5g_mode"
+        android:title="@string/preferred_5g_mode_title"
+        android:summary="@string/preferred_5g_mode_summary"
+        android:icon="@drawable/ic_5g"
+        android:order="-10"
+        settings:controller="co.aospa.settings.network.PreferredNrModePreferenceController">
+        <intent
+            android:targetPackage="org.sun.nrmode"
+            android:targetClass="org.sun.nrmode.NrModeSettingsActivity" />
+    </Preference>
+
     <com.android.settingslib.RestrictedSwitchPreference
         android:key="airplane_mode"
         android:title="@string/airplane_mode"
