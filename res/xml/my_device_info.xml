@@ -82,6 +82,7 @@
             android:key="eid_info"
             android:order="31"
             android:title="@string/status_eid"
+            android:summary="@string/summary_placeholder"
             android:positiveButtonText="@string/dlg_ok"
             android:dialogLayout="@layout/dialog_eid_status"
             settings:isPreferenceVisible="@bool/config_show_sim_info"

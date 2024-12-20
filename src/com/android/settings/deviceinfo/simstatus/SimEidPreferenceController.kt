@@ -92,7 +92,6 @@ class SimEidPreferenceController(context: Context, preferenceKey: String) :
             }
             preference.title = title
             preference.dialogTitle = title
-            preference.summary = eid
             updateDialog()
         }
     }
