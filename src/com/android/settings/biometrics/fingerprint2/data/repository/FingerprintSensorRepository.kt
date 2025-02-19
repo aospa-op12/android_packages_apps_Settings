@@ -85,6 +85,7 @@ class FingerprintSensorRepositoryImpl(
         listOf<ComponentInfoInternal>(),
         FingerprintSensorProperties.TYPE_UNKNOWN,
         false /* halControlsIllumination */,
+        false /* halHandlesDisplayTouches */,
         true /* resetLockoutRequiresHardwareAuthToken */,
         listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
       )

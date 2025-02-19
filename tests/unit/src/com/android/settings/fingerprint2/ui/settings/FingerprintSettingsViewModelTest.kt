@@ -106,6 +106,7 @@ class FingerprintSettingsViewModelTest {
             listOf<ComponentInfoInternal>(),
             FingerprintSensorProperties.TYPE_UDFPS_OPTICAL,
             false /* halControlsIllumination */,
+            false /* halHandlesDisplayTouches */,
             true /* resetLockoutRequiresHardwareAuthToken */,
             listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
           )
@@ -148,6 +149,7 @@ class FingerprintSettingsViewModelTest {
             listOf<ComponentInfoInternal>(),
             FingerprintSensorProperties.TYPE_UDFPS_ULTRASONIC,
             false /* halControlsIllumination */,
+            false /* halHandlesDisplayTouches */,
             true /* resetLockoutRequiresHardwareAuthToken */,
             listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
           )
@@ -188,6 +190,7 @@ class FingerprintSettingsViewModelTest {
             listOf<ComponentInfoInternal>(),
             FingerprintSensorProperties.TYPE_POWER_BUTTON,
             false /* halControlsIllumination */,
+            false /* halHandlesDisplayTouches */,
             true /* resetLockoutRequiresHardwareAuthToken */,
             listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
           )
@@ -399,6 +402,7 @@ class FingerprintSettingsViewModelTest {
           listOf<ComponentInfoInternal>(),
           FingerprintSensorProperties.TYPE_POWER_BUTTON,
           false /* halControlsIllumination */,
+          false /* halHandlesDisplayTouches */,
           true /* resetLockoutRequiresHardwareAuthToken */,
           listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
         )

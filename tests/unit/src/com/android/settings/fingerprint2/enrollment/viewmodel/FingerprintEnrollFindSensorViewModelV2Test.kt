@@ -156,6 +156,7 @@ class FingerprintEnrollFindSensorViewModelV2Test {
             listOf<ComponentInfoInternal>(),
             FingerprintSensorProperties.TYPE_UDFPS_OPTICAL,
             false /* halControlsIllumination */,
+            false /* halHandlesDisplayTouches */,
             true /* resetLockoutRequiresHardwareAuthToken */,
             listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
           )
@@ -220,6 +221,7 @@ class FingerprintEnrollFindSensorViewModelV2Test {
             listOf<ComponentInfoInternal>(),
             FingerprintSensorProperties.TYPE_REAR,
             false /* halControlsIllumination */,
+            false /* halHandlesDisplayTouches */,
             true /* resetLockoutRequiresHardwareAuthToken */,
             listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
           )
@@ -244,6 +246,7 @@ class FingerprintEnrollFindSensorViewModelV2Test {
             listOf<ComponentInfoInternal>(),
             FingerprintSensorProperties.TYPE_UDFPS_OPTICAL,
             false /* halControlsIllumination */,
+            false /* halHandlesDisplayTouches */,
             true /* resetLockoutRequiresHardwareAuthToken */,
             listOf<SensorLocationInternal>(SensorLocationInternal.DEFAULT),
           )
