@@ -22,4 +22,7 @@
     <!-- Show haptic styles -->
     <bool name="config_supportHapticProfiles" translatable="false">false</bool>
 
+    <!-- Show high touch polling rate option -->
+    <bool name="config_supportHighTouchRate" translatable="false">false</bool>
+
 </resources>

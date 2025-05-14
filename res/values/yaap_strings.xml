@@ -16,4 +16,8 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- Haptic Effect Style -->
     <string name="haptic_effect_style_title">Haptic effect style</string>
+
+    <!-- High touch rate -->
+    <string name="touch_rate_title">Increase touch polling rate</string>
+    <string name="touch_rate_summary">Improves touch response by utilizing a higher polling rate</string>
 </resources>
