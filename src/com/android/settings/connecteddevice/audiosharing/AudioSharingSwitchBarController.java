@@ -388,6 +388,24 @@ public class AudioSharingSwitchBarController extends BasePreferenceController
             Log.d(TAG, "Skip handleStartAudioSharingFromIntent. Profile is not ready.");
             return;
         }
+        // Compensate for an onBroadcastMetadataChanged possibly dropped during a rapid
+        // stop/restart cycle. Must run on mExecutor and share the mStartingSharing CAS
+        // with the real callback so at most one of them triggers addSource.
+        if (mStartingSharing.get() && mBroadcast != null) {
+            mExecutor.execute(
+                    () -> {
+                        BluetoothLeBroadcastMetadata metadata =
+                                mBroadcast.getLatestBluetoothLeBroadcastMetadata();
+                        if (metadata != null
+                                && mStartingSharing.compareAndSet(true, false)) {
+                            Log.d(
+                                    TAG,
+                                    "Compensate missed onBroadcastMetadataChanged, broadcastId = "
+                                            + metadata.getBroadcastId());
+                            handleOnBroadcastReady(metadata);
+                        }
+                    });
+        }
         if (mIntentHandleStage.compareAndSet(
                 StartIntentHandleStage.TO_HANDLE.getId(),
                 StartIntentHandleStage.HANDLE_AUTO_ADD.getId())) {

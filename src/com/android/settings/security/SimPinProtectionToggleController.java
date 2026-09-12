@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 package com.android.settings.security;
 
 import android.app.KeyguardManager;
@@ -109,7 +114,11 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
 
     private TelephonyManager mTelephonyManager;
     private SubscriptionManager mSubscriptionManager;
-    private int mSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    // Store the physical slot index instead of a snapshot subId.
+    // getSubId() performs a live lookup on every call so that SIM
+    // hot-swap events (new card -> new subId) are reflected immediately
+    // without requiring the fragment to be recreated.
+    private int mSlotIndex = -1;
 
     private EnrollmentState mEnrollmentState;
 
@@ -144,9 +153,14 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
 
     @Override
     public boolean isChecked() {
+        int subId = getSubId();
+        if (!SubscriptionManager.isValidSubscriptionId(subId)) {
+            Log.d(TAG, "isChecked: invalid subId=" + subId + ", returning false");
+            return false;
+        }
         boolean isPlatformManaged = mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(
-                mSubId);
-        boolean isIccLockEnabled = mAutoManagedSimPinHelper.isIccLockEnabled(mSubId);
+                subId);
+        boolean isIccLockEnabled = mAutoManagedSimPinHelper.isIccLockEnabled(subId);
 
         return isPlatformManaged || isIccLockEnabled;
     }
@@ -165,10 +179,11 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
     }
 
     private void disableManualOrAutomaticSimPin() {
-        if (mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(mSubId)) {
+        int subId = getSubId();
+        if (mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(subId)) {
             showAuthenticationDialogSimUnenrollment(
-                    mTelephonyManager.createForSubscriptionId(mSubId));
-        } else if (mAutoManagedSimPinHelper.isIccLockEnabled(mSubId)) {
+                    mTelephonyManager.createForSubscriptionId(subId));
+        } else if (mAutoManagedSimPinHelper.isIccLockEnabled(subId)) {
             mEnrollmentState = EnrollmentState.UNENROLL_FROM_MANUAL_PIN_MANAGEMENT;
             showPinEntryDialog();
         } else {
@@ -177,10 +192,11 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
     }
 
     private void enableManualOrAutomaticSimPin() {
+        int subId = getSubId();
         boolean isValidSubscription = mSubscriptionManager != null &&
-                mSubscriptionManager.isValidSubscriptionId(mSubId);
+                mSubscriptionManager.isValidSubscriptionId(subId);
         SubscriptionInfo subInfo = isValidSubscription ? mSubscriptionManager.
-                getActiveSubscriptionInfo(mSubId) : null;
+                getActiveSubscriptionInfo(subId) : null;
         boolean isEmbeddedSim = subInfo != null && subInfo.isEmbedded();
 
         if (isDeviceSecure() && !isEmbeddedSim && Flags.enableAutoSimPinUi()) {
@@ -201,7 +217,7 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
             return CONDITIONALLY_UNAVAILABLE;
         }
 
-        if (!mSubscriptionManager.isValidSubscriptionId(mSubId)) {
+        if (!mSubscriptionManager.isValidSubscriptionId(getSubId())) {
             return CONDITIONALLY_UNAVAILABLE;
         }
 
@@ -226,9 +242,9 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
     }
 
     private int getSummaryResId() {
-        if (mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(mSubId)) {
+        if (mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(getSubId())) {
             return R.string.sim_protection_mode_protected_by_platform;
-        } else if (mAutoManagedSimPinHelper.isIccLockEnabled(mSubId)) {
+        } else if (mAutoManagedSimPinHelper.isIccLockEnabled(getSubId())) {
             return R.string.sim_protection_mode_manually_managed;
         } else if (!isDeviceSecure() && Flags.enableAutoSimPinUi()) {
             return R.string.sim_protection_mode_lskf_required;
@@ -253,7 +269,7 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
             return;
         }
 
-        if (!mSubscriptionManager.isValidSubscriptionId(mSubId)) {
+        if (!mSubscriptionManager.isValidSubscriptionId(getSubId())) {
             Log.w(TAG, "invalid subscription, returning.");
             return;
         }
@@ -278,12 +294,28 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
 
     /**
      * Sets the index of the SIM card slot that this controller is responsible for.
-     * @param slotIndex index in the array of active slots.
+     * Stores the physical slot index; subId is resolved lazily via getSubId()
+     * so that hot-swap events are reflected without a fragment restart.
+     *
+     * @param slotIndex physical slot index (0 or 1).
      */
     public void setSlotIndex(int slotIndex) {
-        mSubId = mAutoManagedSimPinHelper.getSubscriptionIdForSlot(slotIndex);
-        Log.d(TAG, "Preference " + getPreferenceKey() + ": Subscription for slot index " + slotIndex
-                + ": " + mSubId);
+        mSlotIndex = slotIndex;
+        Log.d(TAG, "Preference " + getPreferenceKey() + ": slot index set to " + mSlotIndex
+                + " (live subId=" + mAutoManagedSimPinHelper.getSubscriptionIdForSlot(mSlotIndex)
+                + ")");
+    }
+
+    /**
+     * Returns the current subscription ID for the slot this controller manages.
+     * Always performs a live lookup so that hot-swap events are reflected
+     * immediately without requiring a fragment restart.
+     */
+    private int getSubId() {
+        if (mSlotIndex < 0) {
+            return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        }
+        return mAutoManagedSimPinHelper.getSubscriptionIdForSlot(mSlotIndex);
     }
 
     private boolean isDeviceSecure() {
@@ -389,7 +421,7 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
                 Log.d(TAG, "Enrolling into manual PIN management mode.");
 
                 ListenableFuture<PinResult> future = mAutoManagedSimPinHelper.setIccLockState(
-                        pin, /* enabled= */ true, mSubId);
+                        pin, /* enabled= */ true, getSubId());
                 Futures.addCallback(future, new FutureCallback<PinResult>() {
                     @Override
                     public void onSuccess(PinResult result) {
@@ -418,7 +450,7 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
             }
             case ENROLL_TO_AUTOMATIC_PIN_MANAGEMENT -> {
                 Log.d(TAG, "Enrolling into automatic PIN management mode.");
-                TelephonyManager tm = mTelephonyManager.createForSubscriptionId(mSubId);
+                TelephonyManager tm = mTelephonyManager.createForSubscriptionId(getSubId());
                 tm.enrollSimInAutoPinManagement(pin, mContext.getMainExecutor(),
                         new EnrollmentResultReceiver());
             }
@@ -426,7 +458,7 @@ public class SimPinProtectionToggleController extends TogglePreferenceController
                 Log.d(TAG, "Unenrolling from manual PIN management mode.");
 
                 ListenableFuture<PinResult> future = mAutoManagedSimPinHelper.setIccLockState(
-                        pin, /* enabled= */ false, mSubId);
+                        pin, /* enabled= */ false, getSubId());
                 Futures.addCallback(future, new FutureCallback<PinResult>() {
                     @Override
                     public void onSuccess(PinResult result) {

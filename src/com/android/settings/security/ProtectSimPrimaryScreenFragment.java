@@ -14,15 +14,22 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 package com.android.settings.security;
 
 import android.content.Context;
 import android.os.Bundle;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
+import android.telephony.SubscriptionManager.OnSubscriptionsChangedListener;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.preference.PreferenceCategory;
 
@@ -55,6 +62,7 @@ public class ProtectSimPrimaryScreenFragment extends BaseSimPinFragment {
     public void onAttach(Context context) {
         super.onAttach(context);
 
+        sSubscriptionManager = context.getSystemService(SubscriptionManager.class);
         mAutoManagedSimPinHelper = new AutoManagedSimPinHelper(context);
 
         mControllers = useAll(SimPinProtectionToggleController.class);
@@ -95,10 +103,8 @@ public class ProtectSimPrimaryScreenFragment extends BaseSimPinFragment {
     }
 
     private static int getSubId(Context context) {
-        SubscriptionManager subscriptionManager =
-                context.getSystemService(SubscriptionManager.class);
-        final List<SubscriptionInfo> subInfoList = subscriptionManager
-                == null ? null : subscriptionManager.getActiveSubscriptionInfoList();
+        final List<SubscriptionInfo> subInfoList = sSubscriptionManager
+                == null ? null : sSubscriptionManager.getActiveSubscriptionInfoList();
         if (subInfoList == null) {
             return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         }
@@ -132,12 +138,47 @@ public class ProtectSimPrimaryScreenFragment extends BaseSimPinFragment {
         }
     }
 
+    // SubscriptionManager is used in onAttach, onResume, and onPause;
+    // held as a class member to avoid repeated getSystemService() calls.
+    @Nullable
+    private static SubscriptionManager sSubscriptionManager;
+
+    // Listener registered in onResume / unregistered in onPause so the
+    // carrier-name header AND the PIN toggle checked state always reflect
+    // the currently inserted SIM.  The toggle is driven by
+    // SimPinProtectionToggleController.isChecked(), which is only
+    // re-evaluated when updateState() is called; forceUpdatePreferences()
+    // triggers that path for every controller on the screen.
+    private final OnSubscriptionsChangedListener mSubscriptionsChangedListener =
+            new OnSubscriptionsChangedListener() {
+                @Override
+                public void onSubscriptionsChanged() {
+                    initFirstActiveSlotHeader();
+                    initSecondActiveSlotHeader();
+                    forceUpdatePreferences();
+                }
+            };
+
     @Override
     public void onResume() {
         super.onResume();
 
         initFirstActiveSlotHeader();
         initSecondActiveSlotHeader();
+
+        if (sSubscriptionManager != null) {
+            sSubscriptionManager.addOnSubscriptionsChangedListener(
+                    requireContext().getMainExecutor(), mSubscriptionsChangedListener);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (sSubscriptionManager != null) {
+            sSubscriptionManager.removeOnSubscriptionsChangedListener(
+                    mSubscriptionsChangedListener);
+        }
     }
 
     @VisibleForTesting
@@ -163,9 +204,11 @@ public class ProtectSimPrimaryScreenFragment extends BaseSimPinFragment {
 
         int activeSlot = activeSlots[slotIndex];
 
-        SubscriptionManager subscriptionManager =
-                getContext().getSystemService(SubscriptionManager.class);
-        SubscriptionInfo info = subscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(
+        // Update the category title to reflect the actual physical slot number.
+        category.setTitle(activeSlot == 0 ? R.string.first_sim_card_slot_title
+                : R.string.second_sim_card_slot_title);
+
+        SubscriptionInfo info = sSubscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(
                 activeSlot);
         if (info != null) {
             introPreference.setTitle(info.getCarrierName());

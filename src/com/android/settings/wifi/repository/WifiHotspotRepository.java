@@ -303,6 +303,10 @@ public class WifiHotspotRepository {
                log("Setting band to 2GHz for Enhanced open");
                configBuilder.setBand(BAND_2GHZ);
 // QTI_END: 2024-03-07: WLAN: Tethering: Enable configuration of Enhanced Open (OWE) Security mode.
+               if (!isEnhancedOpenOweOnlyEnabled()) {
+                   log("OWE to OWE_TRANSITION for multi-band");
+                   securityType = SECURITY_TYPE_WPA3_OWE_TRANSITION;
+               }
            } else if ((config.getBand() == BAND_2GHZ || config.getBand() == BAND_2GHZ_5GHZ)
                    && !has6Ghz(config)) {
                if (!isEnhancedOpenOweOnlyEnabled()) {

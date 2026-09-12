@@ -197,6 +197,13 @@ public class WifiTetherSettings extends RestrictedDashboardFragment
         }
         mWifiHotspotSecurity.setVisible(isSpeedFeatureAvailable);
         mWifiHotspotSpeed.setVisible(isSpeedFeatureAvailable);
+
+        // Speed feature supersedes the legacy Extend compatibility toggle; hide it when on.
+        Preference maximizeCompatibility = findPreference(KEY_WIFI_TETHER_MAXIMIZE_COMPATIBILITY);
+        if (maximizeCompatibility != null) {
+            maximizeCompatibility.setVisible(!isSpeedFeatureAvailable);
+        }
+
         if (isSpeedFeatureAvailable) {
             mWifiTetherViewModel.getSecuritySummary().observe(this, this::onSecuritySummaryChanged);
             mWifiTetherViewModel.getSpeedSummary().observe(this, this::onSpeedSummaryChanged);
@@ -524,6 +531,9 @@ public class WifiTetherSettings extends RestrictedDashboardFragment
                 if (!isSpeedFeatureAvailable()) {
                     keys.add(KEY_WIFI_HOTSPOT_SECURITY);
                     keys.add(KEY_WIFI_HOTSPOT_SPEED);
+                } else {
+                    // Also hide legacy Extend compatibility from search when Speed is on.
+                    keys.add(KEY_WIFI_TETHER_MAXIMIZE_COMPATIBILITY);
                 }
                 if (!mIsInstantHotspotEnabled) {
                     keys.add(KEY_INSTANT_HOTSPOT);

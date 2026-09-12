@@ -78,6 +78,7 @@ class WifiPickerRepository(
                     }
 
                 tracker = createWifiPickerTracker(workerThread, callback)
+                tracker.disableScanning()
                 tracker.onStart()
 
                 awaitClose {

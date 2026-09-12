@@ -14,23 +14,37 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * All rights reserved.
+ * Confidential and Proprietary - Qualcomm Technologies, Inc.
+ */
+
 package com.android.settings.network.telephony
 
 import android.content.Context
 import android.telecom.TelecomManager
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.shareIn
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CallStateRepository(
@@ -50,12 +64,22 @@ class CallStateRepository(
     /**
      * Flow for in call state.
      *
-     * @return true if any active subscription's call state is not idle.
+     * @return true if any subscription's call state is not idle.
      */
     fun isInCallFlow(): Flow<Boolean> = subscriptionRepository.activeSubscriptionIdListFlow()
         .flatMapLatest { subIds ->
             if (subIds.isEmpty()) {
-                flowOf(false)
+                // No active subscriptions — still monitor the default phone so that
+                // emergency calls placed without a valid SIM are detected.
+                // Query once immediately via isInEmergencyCallFlow for the initial state,
+                // then monitor ongoing changes via a shared callStateFlow to avoid
+                // duplicate callback registration when multiple instances exist.
+                Log.d(TAG, "isInCallFlow: no active subs, query emergency call state")
+                merge(
+                    isInEmergencyCallFlow(),
+                    getSharedDefaultSubCallStateFlow()
+                        .map { it != TelephonyManager.CALL_STATE_IDLE },
+                )
             } else {
                 combine(subIds.map(::callStateFlow)) { states ->
                     states.any { it != TelephonyManager.CALL_STATE_IDLE }
@@ -68,14 +92,34 @@ class CallStateRepository(
         .flowOn(Dispatchers.Default)
 
     fun isInEmergencyCallFlow(): Flow<Boolean> {
-       val telecomManager = context.getSystemService(TelecomManager::class.java)
+        val telecomManager = context.getSystemService(TelecomManager::class.java)
         return if (telecomManager == null)
             flowOf(false)
         else
             flowOf(telecomManager.isInEmergencyCall)
     }
 
+    private fun getSharedDefaultSubCallStateFlow(): Flow<Int> =
+        getOrCreateSharedDefaultSubCallStateFlow(context.applicationContext)
+
     private companion object {
         private const val TAG = "CallStateRepository"
+        private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        @Volatile
+        private var sharedDefaultSubCallStateFlow: SharedFlow<Int>? = null
+
+        @Synchronized
+        private fun getOrCreateSharedDefaultSubCallStateFlow(context: Context): SharedFlow<Int> =
+            sharedDefaultSubCallStateFlow ?: context.telephonyCallbackFlow(
+                SubscriptionManager.DEFAULT_SUBSCRIPTION_ID,
+            ) {
+                object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                    override fun onCallStateChanged(state: Int) {
+                        trySend(state)
+                    }
+                }
+            }.shareIn(repositoryScope, SharingStarted.WhileSubscribed(), replay = 1)
+                .also { sharedDefaultSubCallStateFlow = it }
     }
 }

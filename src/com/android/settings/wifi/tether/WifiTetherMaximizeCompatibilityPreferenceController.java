@@ -71,6 +71,11 @@ public class WifiTetherMaximizeCompatibilityPreferenceController extends
         if (mPreference == null) {
             return;
         }
+        if (mShouldHidePreference) {
+            mPreference.setVisible(false);
+            return;
+        }
+        mPreference.setVisible(true);
         mPreference.setEnabled(is5GhzBandSupported());
         ((TwoStatePreference) mPreference).setChecked(mIsChecked);
         mPreference.setSummary(mWifiManager.isBridgedApConcurrencySupported()

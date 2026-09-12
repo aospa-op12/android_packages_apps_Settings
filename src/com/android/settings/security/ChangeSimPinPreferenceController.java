@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 package com.android.settings.security;
 
 import static android.telephony.PinResult.PIN_RESULT_TYPE_SUCCESS;
@@ -63,9 +68,17 @@ public class ChangeSimPinPreferenceController extends BasePreferenceController i
 
     private final AutoManagedSimPinHelper mAutoManagedSimPinHelper;
     private final SubscriptionManager mSubscriptionManager;
-    private int mSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    // Store the physical slot index instead of a snapshot subId.
+    // getSubId() performs a live lookup on every call so that SIM
+    // hot-swap events (new card -> new subId) are reflected immediately
+    // without requiring the fragment to be recreated.
+    private int mSlotIndex = -1;
     // TODO: http://b/487265436 - store state of controller in case of fragment re-creation.
     private int mState = STATE_ENTER_CURRENT_PIN;
+    // Captured on the main thread when the user initiates a PIN change so that the
+    // background ChangeSimPin task targets the same subscription even if a hot-swap
+    // occurs during the multi-step dialog.
+    private int mPinChangeSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 
     @Nullable private String mCurrentPin;
     @Nullable private String mNewPin;
@@ -94,13 +107,13 @@ public class ChangeSimPinPreferenceController extends BasePreferenceController i
      */
     @VisibleForTesting
     public boolean mayChangeSimPin() {
-        return mAutoManagedSimPinHelper.isIccLockEnabled(mSubId)
-                && !mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(mSubId);
+        return mAutoManagedSimPinHelper.isIccLockEnabled(getSubId())
+                && !mAutoManagedSimPinHelper.isPinAutoManagedForSubscription(getSubId());
     }
 
     @Override
     public int getAvailabilityStatus() {
-        if (!mSubscriptionManager.isValidSubscriptionId(mSubId)) {
+        if (!mSubscriptionManager.isValidSubscriptionId(getSubId())) {
             Log.d(TAG, "Invalid subscription for " + getPreferenceKey());
             return CONDITIONALLY_UNAVAILABLE;
         }
@@ -133,6 +146,7 @@ public class ChangeSimPinPreferenceController extends BasePreferenceController i
     @Override
     public boolean onPreferenceClick(@NonNull Preference preference) {
         resetState();
+        mPinChangeSubId = getSubId();
         showPinEntryDialog(getDialogForState(mState, false));
         return true;
     }
@@ -155,6 +169,7 @@ public class ChangeSimPinPreferenceController extends BasePreferenceController i
         mState = STATE_ENTER_CURRENT_PIN;
         mCurrentPin = null;
         mNewPin = null;
+        mPinChangeSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
     }
 
     @NonNull
@@ -206,7 +221,7 @@ public class ChangeSimPinPreferenceController extends BasePreferenceController i
             Log.e(TAG, "Invalid state: Current or new PIN are uninitialized.");
             return;
         }
-        ChangeSimPin changeSimPin = new ChangeSimPin(mCurrentPin, mNewPin);
+        ChangeSimPin changeSimPin = new ChangeSimPin(mCurrentPin, mNewPin, mPinChangeSubId);
         ListenableFuture<PinResult> future = ThreadUtils.postOnBackgroundThread(changeSimPin);
         Futures.addCallback(future, new FutureCallback<PinResult>() {
             @Override
@@ -243,21 +258,39 @@ public class ChangeSimPinPreferenceController extends BasePreferenceController i
 
     /**
      * Sets the index of the SIM card slot that this controller is responsible for.
-     * @param slotIndex index in the array of active slots.
+     * Stores the physical slot index; subId is resolved lazily via getSubId()
+     * so that hot-swap events are reflected without a fragment restart.
+     *
+     * @param slotIndex physical slot index (0 or 1).
      */
     public void setSlotIndex(int slotIndex) {
-        mSubId = mAutoManagedSimPinHelper.getSubscriptionIdForSlot(slotIndex);
-        Log.d(TAG, "Preference " + getPreferenceKey() + ": Subscription for slot index " + slotIndex
-                + ": " + mSubId);
+        mSlotIndex = slotIndex;
+        Log.d(TAG, "Preference " + getPreferenceKey() + ": slot index set to " + mSlotIndex
+                + " (live subId=" + mAutoManagedSimPinHelper.getSubscriptionIdForSlot(mSlotIndex)
+                + ")");
+    }
+
+    /**
+     * Returns the current subscription ID for the slot this controller manages.
+     * Always performs a live lookup so that hot-swap events are reflected
+     * immediately without requiring a fragment restart.
+     */
+    private int getSubId() {
+        if (mSlotIndex < 0) {
+            return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        }
+        return mAutoManagedSimPinHelper.getSubscriptionIdForSlot(mSlotIndex);
     }
 
     private class ChangeSimPin implements Callable<PinResult> {
         @NonNull private final String mCurrentPin;
         @NonNull private final String mNewPin;
+        private final int mSubId;
 
-        private ChangeSimPin(@NonNull String currentPin, @NonNull String newPin) {
+        private ChangeSimPin(@NonNull String currentPin, @NonNull String newPin, int subId) {
             mCurrentPin = currentPin;
             mNewPin = newPin;
+            mSubId = subId;
         }
 
         @Override

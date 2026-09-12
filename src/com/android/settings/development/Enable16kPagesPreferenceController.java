@@ -305,6 +305,13 @@ public class Enable16kPagesPreferenceController extends DeveloperOptionsPreferen
             long payloadSize,
             @NonNull List<String> properties)
             throws FileNotFoundException {
+        // Ensure forward merge indicator is set so recovery doesn't roll back
+        // the slot when wiping /data for the 16K page size transition.
+        if (!Enable16kUtils.isDataExt4()) {
+            if (!properties.contains("POWERWASH=1")) {
+                properties.add("POWERWASH=1");
+            }
+        }
         String[] header = properties.stream().toArray(String[]::new);
         UpdateEngineStable updateEngineStable = new UpdateEngineStable();
         try {
