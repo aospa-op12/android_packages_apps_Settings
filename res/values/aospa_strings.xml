@@ -10,4 +10,9 @@
     <string name="edge_grip_suppression_title">Edge grip suppression width</string>
     <string name="edge_grip_suppression_summary">0 disables edge grip suppression; 1-5 adjusts the curved-edge width</string>
 
+    <!-- Face enrollment posture guidance (devices that require a specific posture) -->
+    <string name="face_enrolling_close_to_continue">Fold phone during setup</string>
+    <string name="face_enrolling_close_to_continue_description">The phone must be folded to set up or use Face Unlock</string>
+    <string name="face_enrolling_do_it_later">Do it later</string>
+
 </resources>
