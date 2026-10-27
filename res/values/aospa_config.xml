@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Show edge grip suppression width option -->
+    <bool name="config_supportEdgeGripSuppression" translatable="false">false</bool>
+
+</resources>
